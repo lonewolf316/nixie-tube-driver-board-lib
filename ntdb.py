@@ -29,6 +29,7 @@ class omnixie_ntdb:
             0b0000000000  #display off
         ]
 
+    # Setup GPIO pins
     def setup(self):
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.DATA_PIN, GPIO.OUT)
@@ -36,20 +37,22 @@ class omnixie_ntdb:
         GPIO.setup(self.LATCH_PIN, GPIO.OUT)
         GPIO.setup(self.HV_PIN, GPIO.OUT)
 
+    # Shift digits through register
     def shift_out(self, digits):
         for i in range(8):
             GPIO.output(self.DATA_PIN, (digits >> i) & 0x01)
             GPIO.output(self.CLOCK_PIN, GPIO.LOW)
             GPIO.output(self.CLOCK_PIN, GPIO.HIGH)
-
+    
+    # Run the shift function for the full set of digits
     def display(self):
         for i in range(self.NTDB_COUNT * 5):
             self.shift_out(self.data[i])
         GPIO.output(self.LATCH_PIN, GPIO.LOW)
         GPIO.output(self.LATCH_PIN, GPIO.HIGH)    
 
+    # Convert into the bit notification 
     def set_number(self, number):
-        
         if number < 0:
             number = 0
         if number > 9999:
@@ -60,12 +63,13 @@ class omnixie_ntdb:
         digit_left3 = (number // 10) % 10 if (self.mask & 0b0010) == 0b0010 else 10
         digit_left4 = number % 10 if (self.mask & 0b0001) == 0b0001 else 10
         
-        self.data[0] = (self.digit_data[digit_left4] & 0b11111111)
-        self.data[1] = (((self.digit_data[digit_left4] & 0b1100000000) >> 8) | ((self.digit_data[digit_left3] & 0b111111) << 2))
-        self.data[2] = (((self.digit_data[digit_left3] & 0b1111000000) >> 6) | ((self.digit_data[digit_left2] & 0b1111) << 4))
-        self.data[3] = (((self.digit_data[digit_left2] & 0b1111110000) >> 4) | ((self.digit_data[digit_left1] & 0b11) << 6))
-        self.data[4] = (((self.digit_data[digit_left1] & 0b1111111100) >> 2))
+        self.data[0] = self.digit_data[digit_left4] & 0b11111111
+        self.data[1] = ((self.digit_data[digit_left4] & 0b1100000000) >> 8) | ((self.digit_data[digit_left3] & 0b111111) << 2)
+        self.data[2] = ((self.digit_data[digit_left3] & 0b1111000000) >> 6) | ((self.digit_data[digit_left2] & 0b1111) << 4)
+        self.data[3] = ((self.digit_data[digit_left2] & 0b1111110000) >> 4) | ((self.digit_data[digit_left1] & 0b11) << 6)
+        self.data[4] = ((self.digit_data[digit_left1] & 0b1111111100) >> 2)
 
+    # Set mask to turn off tubes if character does not exist
     def set_mask(self, number):
             if number < 10:
                 self.mask = 0b1
@@ -76,6 +80,7 @@ class omnixie_ntdb:
             else:
                 self.mask = 0b1111
 
+    # Toggle voltage to the tubes
     def hv_enable(self, hv):
         GPIO.output(self.HV_PIN, GPIO.LOW if hv else GPIO.HIGH)
 
@@ -89,7 +94,7 @@ def main():
             ntdb.set_mask(i)
             ntdb.set_number(i)
             ntdb.display()
-            time.sleep(.25)  # Display each number for a second
+            time.sleep(.25)
     except KeyboardInterrupt:
         pass
     finally:
